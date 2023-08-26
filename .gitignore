@@ -1,5 +1,5 @@
 .env
-
+ca.pem
 # Logs
 logs
 *.log
