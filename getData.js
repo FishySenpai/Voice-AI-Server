@@ -1,11 +1,12 @@
 const axios = require("axios");
 const fs = require("fs");
+require("dotenv").config();
 const apiUrl =
   "https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM"; // Replace <voice-id> with the actual voice ID
-const xiApiKey = "2a0e3af64ea95b70b4c92f05411c03c5"; // Replace <xi-api-key> with your actual API key
+const xiApiKey = process.env.xiApiKey; // Replace <xi-api-key> with your actual API key
 
 const requestData = {
-  text: "why are you gay",
+  text: "i fucking hate my life why did this take so long",
   model_id: "eleven_monolingual_v1",
   voice_settings: {
     stability: 0.5,
