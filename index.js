@@ -66,16 +66,31 @@ app.post("/text", async (req, res) => {
     });
 
     // Handle the API response here
+
     if (response.status === 200) {
       const audioData = response.data;
 
-      // Insert both the text and audio data into the database
-      const newText = await pool.query(
-        "INSERT INTO text (description, audio) VALUES ($1, $2) RETURNING *",
-        [description, audioData]
-      );
+      // Generate a unique filename (e.g., using a timestamp)
+      const fileName = `audio_${Date.now()}.mp3`;
 
-      res.json(newText);
+      // Define the path where you want to save the audio file
+      const filePath = `audio/public/${fileName}`;
+
+      // Write the audio data to the file
+      fs.writeFile(filePath, audioData, "binary", async (err) => {
+        if (err) {
+          console.error("Error saving audio file:", err);
+          res.status(500).json({ error: "Failed to save audio" });
+        } else {
+          // Insert the path to the audio file into the database
+          const newText = await pool.query(
+            "INSERT INTO text (description, audio) VALUES ($1, $2) RETURNING *",
+            [description, filePath]
+          );
+
+          res.json(newText);
+        }
+      });
     } else {
       console.error("API request failed with status:", response.status);
       res.status(500).json({ error: "Failed to generate audio" });
@@ -116,7 +131,6 @@ app.post("/register", async (req, res) => {
   }
 });
 
-
 app.get("/login", (req, res) => {
   if (req.session.user) {
     res.send({ loggedIn: true, user: req.session.user });
@@ -124,8 +138,6 @@ app.get("/login", (req, res) => {
     res.send({ loggedIn: false });
   }
 });
-
-
 
 app.post("/login", async (req, res) => {
   const email = req.body.email;
@@ -159,15 +171,35 @@ app.post("/login", async (req, res) => {
 
 
 app.get("/all", async (req, res) => {
-  {
-    try {
-      const newText = await pool.query("SELECT * FROM text");
-      res.json(newText.rows);
-    } catch (err) {
-      console.error(err.message);
+  try {
+    // Query the database to retrieve the audio file paths
+    const result = await pool.query("SELECT * FROM text");
+
+    // Prepare an array to hold the audio file data
+    const audioFiles = [];
+
+    // Iterate through the database results
+    for (const row of result.rows) {
+      const audioPath = row.audio; // Adjust this column name to match your schema
+
+      // Read the audio file from the server
+      const audioData = fs.readFileSync(audioPath);
+
+      audioFiles.push({
+        text_id: row.text_id,
+        description: row.description, // Add any other relevant data you want to include
+        audioData: audioData, // Convert audio data to base64 for sending
+      });
     }
+
+    // Send the array of audio files as JSON response
+    res.json(audioFiles);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
+
 app.delete("/delete/:id", async (req, res) => {
   {
     try {
