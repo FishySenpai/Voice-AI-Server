@@ -220,6 +220,36 @@ app.get("/all", async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+app.get("/user/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    // Query the database to retrieve the audio file paths
+    const result = await pool.query("SELECT * FROM user_audio where user_id = $1", [id]);
+
+    // Prepare an array to hold the audio file data
+    const audioFiles = [];
+
+    // Iterate through the database results
+    for (const row of result.rows) {
+      const audioPath = row.audio_path; // Adjust this column name to match your schema
+
+      // Read the audio file from the server
+      const audioData = fs.readFileSync(audioPath);
+
+      audioFiles.push({
+        id: row.id,
+        description: row.description, // Add any other relevant data you want to include
+        audioData: audioData, // Convert audio data to base64 for sending
+      });
+    }
+
+    // Send the array of audio files as JSON response
+    res.json(audioFiles);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 app.delete("/delete/:id", async (req, res) => {
   {
@@ -229,6 +259,19 @@ app.delete("/delete/:id", async (req, res) => {
         id,
       ]);
       res.json("text was deleted");
+    } catch (err) {
+      console.error(err.message);
+    }
+  }
+});
+app.delete("/user/delete/:id", async (req, res) => {
+  {
+    try {
+      const { id } = req.params;
+      const newText = await pool.query("DELETE FROM user_audio WHERE id = $1", [
+        id,
+      ]);
+      res.json("file deleted was deleted");
     } catch (err) {
       console.error(err.message);
     }
