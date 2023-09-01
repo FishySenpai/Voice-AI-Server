@@ -15,7 +15,7 @@ app.use(express.json());
 app.use(
   cors({
     origin: ["http://localhost:5173"],
-    methods: ["GET", "POST"],
+    methods: ["GET", "POST", "DELETE"],
     credentials: true,
   })
 );
@@ -35,71 +35,6 @@ app.use(
     },
   })
 );
-
-app.post("/text", async (req, res) => {
-  try {
-    const { description } = req.body;
-
-    // Make a request to the external API to generate audio
-    const apiUrl =
-      "https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM"; // Replace with your actual API endpoint
-    const xiApiKey = process.env.xiApiKey; // Replace with your actual API key
-
-    const requestData = {
-      text: description, // Use the text from the request body
-      model_id: "eleven_monolingual_v1",
-      voice_settings: {
-        stability: 0.5,
-        similarity_boost: 0.5,
-      },
-    };
-
-    const headers = {
-      accept: "audio/mpeg",
-      "xi-api-key": xiApiKey,
-      "Content-Type": "application/json",
-    };
-
-    const response = await axios.post(apiUrl, requestData, {
-      headers,
-      responseType: "arraybuffer",
-    });
-
-    // Handle the API response here
-
-    if (response.status === 200) {
-      const audioData = response.data;
-
-      // Generate a unique filename (e.g., using a timestamp)
-      const fileName = `audio_${Date.now()}.mp3`;
-
-      // Define the path where you want to save the audio file
-      const filePath = `audio/public/${fileName}`;
-
-      // Write the audio data to the file
-      fs.writeFile(filePath, audioData, "binary", async (err) => {
-        if (err) {
-          console.error("Error saving audio file:", err);
-          res.status(500).json({ error: "Failed to save audio" });
-        } else {
-          // Insert the path to the audio file into the database
-          const newText = await pool.query(
-            "INSERT INTO text (description, audio) VALUES ($1, $2) RETURNING *",
-            [description, filePath]
-          );
-
-          res.json(newText);
-        }
-      });
-    } else {
-      console.error("API request failed with status:", response.status);
-      res.status(500).json({ error: "Failed to generate audio" });
-    }
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
 
 app.post("/register", async (req, res) => {
   try {
@@ -133,7 +68,11 @@ app.post("/register", async (req, res) => {
 
 app.get("/login", (req, res) => {
   if (req.session.user) {
-    res.send({ loggedIn: true, user: req.session.user });
+    res.send({
+      loggedIn: true,
+      id: req.session.user.id,
+      name: req.session.user.name,
+    });
   } else {
     res.send({ loggedIn: false });
   }
@@ -169,6 +108,88 @@ app.post("/login", async (req, res) => {
   }
 });
 
+app.post("/text", async (req, res) => {
+  console.log(req.session.user);
+  try {
+    const { description, id } = req.body;
+
+    // Make a request to the external API to generate audio
+    const apiUrl =
+      "https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM"; // Replace with your actual API endpoint
+    const xiApiKey = process.env.xiApiKey; // Replace with your actual API key
+
+    const requestData = {
+      text: description, // Use the text from the request body
+      model_id: "eleven_monolingual_v1",
+      voice_settings: {
+        stability: 0.5,
+        similarity_boost: 0.5,
+      },
+    };
+
+    const headers = {
+      accept: "audio/mpeg",
+      "xi-api-key": xiApiKey,
+      "Content-Type": "application/json",
+    };
+
+    const response = await axios.post(apiUrl, requestData, {
+      headers,
+      responseType: "arraybuffer",
+    });
+
+    // Handle the API response here
+    if (response.status === 200) {
+      const audioData = response.data;
+      const fileName = `audio_${Date.now()}.mp3`;
+      
+
+;
+      if (!id) {
+        // No user, insert into the general text table
+        const publicFilePath = `audio/public/${fileName}`;
+        fs.writeFile(publicFilePath, audioData, "binary", async (err) => {
+          if (err) {
+            console.error("Error saving audio file:", err);
+            res.status(500).json({ error: "Failed to save audio" });
+          } else {
+            const newText = await pool.query(
+              "INSERT INTO text (description, audio) VALUES ($1, $2) RETURNING *",
+              [description, publicFilePath]
+            );
+
+            res.json(newText);
+          }
+        });
+      } else {
+        const path = `audio/users/${id}`;
+
+        if (!fs.existsSync(path)) {
+          fs.mkdirSync(path, { recursive: true });
+        }
+        // User exists, insert into the user-specific table
+        const userFilePath = `audio/users/${id}/${fileName}`;
+
+        fs.writeFile(userFilePath, audioData, "binary", async (err) => {
+          if (err) {
+            console.error("Error saving audio file:", err);
+            res.status(500).json({ error: "Failed to save audio" });
+          } else {
+            const newUserAudio = await pool.query(
+              `INSERT INTO user_audio (user_id, description, audio_path) VALUES ($1, $2, $3) RETURNING *`,
+              [id, description, userFilePath]
+            );
+
+            res.json(newUserAudio);
+          }
+        });
+      }
+    }
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 app.get("/all", async (req, res) => {
   try {
