@@ -111,11 +111,11 @@ app.post("/login", async (req, res) => {
 app.post("/text", async (req, res) => {
   console.log(req.session.user);
   try {
-    const { description, id } = req.body;
+    const { description, id, voiceId } = req.body;
 
     // Make a request to the external API to generate audio
     const apiUrl =
-      "https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM"; // Replace with your actual API endpoint
+      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`; // Replace with your actual API endpoint
     const xiApiKey = process.env.xiApiKey; // Replace with your actual API key
 
     const requestData = {
