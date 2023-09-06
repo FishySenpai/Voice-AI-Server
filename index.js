@@ -158,7 +158,7 @@ app.post("/text", async (req, res) => {
               [description, publicFilePath]
             );
 
-            res.json(newText);
+            res.json(audioData);
           }
         });
       } else {
@@ -220,6 +220,7 @@ app.get("/all", async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
 app.get("/user/:id", async (req, res) => {
   try {
     const { id } = req.params;
