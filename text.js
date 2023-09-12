@@ -11,7 +11,7 @@ conn.search = "";
 const pool = new Pool({
   connectionString: conn.href,
   ssl: {
-    rejectUnauthorized: true,
+    rejectUnauthorized: false,
     ca: process.env.ca,
   },
 });
