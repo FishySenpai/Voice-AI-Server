@@ -272,6 +272,7 @@ app.delete("/user/delete/:id", async (req, res) => {
       const newText = await pool.query("DELETE FROM user_audio WHERE id = $1", [
         id,
       ]);
+      console.log(newText)
       res.json("file deleted was deleted");
     } catch (err) {
       console.error(err.message);
