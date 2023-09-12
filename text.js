@@ -12,7 +12,7 @@ const pool = new Pool({
   connectionString: conn.href,
   ssl: {
     rejectUnauthorized: true,
-    ca: fs.readFileSync("./ca.pem").toString(),
+    ca: process.env.ca,
   },
 });
 
