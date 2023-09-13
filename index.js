@@ -30,7 +30,7 @@ app.use(
     saveUninitialized: false,
     cookie: {
       expires: 60 * 60 * 60 * 24,
-      domain: "raspberry-goldfish-tam.cyclic.app", // Verify this domain
+      domain: ".cyclic.app", // Verify this domain
       path: "/",
     },
   })
