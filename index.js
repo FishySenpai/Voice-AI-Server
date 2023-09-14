@@ -14,7 +14,7 @@ const fs = require("fs");
 app.use(express.json());
 app.use(
   cors({
-    origin: ["http://localhost:5173"],
+    origin: ["https://voice-ai-clone.netlify.app"],
     methods: ["GET", "POST", "DELETE"],
     credentials: true,
   })
@@ -30,8 +30,10 @@ app.use(
     saveUninitialized: false,
     cookie: {
       expires: 60 * 60 * 60 * 24,
-      domain: ".cyclic.app", // Verify this domain
+      domain: ".cyclic.app", // Set the appropriate domain
       path: "/",
+      sameSite: "None", // Add the SameSite attribute
+      secure: true, // Set secure to true when using HTTPS
     },
   })
 );
