@@ -33,7 +33,7 @@ app.use(
       domain: ".cyclic.app", // Set the appropriate domain
       path: "/",
       sameSite: "None", // Add the SameSite attribute
-      secure: false, // Set secure to true when using HTTPS
+      secure: true, // Set secure to true when using HTTPS
     },
   })
 );
