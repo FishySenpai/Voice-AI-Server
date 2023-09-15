@@ -11,10 +11,21 @@ const session = require("express-session");
 const saltRounds = 10;
 require("dotenv").config();
 const fs = require("fs");
+const { S3, PutObjectCommand } = require("@aws-sdk/client-s3");
+const { Readable } = require("stream");
+const s3 = new S3({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    sessionToken: process.env.AWS_SESSION_TOKEN,
+  },
+});
+
 app.use(express.json());
 app.use(
   cors({
-    origin: ["https://voice-ai-clone.netlify.app"],
+    origin: ["http://localhost:5173"],
     methods: ["GET", "POST", "DELETE"],
     credentials: true,
   })
@@ -30,10 +41,9 @@ app.use(
     saveUninitialized: false,
     cookie: {
       expires: 60 * 60 * 60 * 24,
-      domain: ".cyclic.app", // Set the appropriate domain
+      domain: "localhost", // Set the appropriate domain
       path: "/",
-      sameSite: "None", // Add the SameSite attribute
-      secure: isProduction, // Set secure to true when using HTTPS
+ // Set secure to true when using HTTPS
     },
   })
 );
@@ -140,51 +150,56 @@ app.post("/text", async (req, res) => {
       responseType: "arraybuffer",
     });
 
-    // Handle the API response here
     if (response.status === 200) {
       const audioData = response.data;
       const fileName = `audio_${Date.now()}.mp3`;
-      
 
-;
-      if (!id) {
-        // No user, insert into the general text table
-        const publicFilePath = `audio/public/${fileName}`;
-        fs.writeFile(publicFilePath, audioData, "binary", async (err) => {
-          if (err) {
-            console.error("Error saving audio file:", err);
-            res.status(500).json({ error: "Failed to save audio" });
-          } else {
+      // Calculate the content length of the audio data
+      const contentLength = audioData.length;
+
+      // Convert audioData to a readable stream
+      const audioStream = new Readable();
+      audioStream.push(audioData);
+      audioStream.push(null);
+
+      const params = {
+        Bucket: process.env.BUCKET, // Replace with your S3 bucket name
+        Key: fileName,
+        Body: audioStream,
+        ContentType: "audio/mpeg",
+        ContentLength: contentLength, // Set the content length
+      };
+
+      try {
+        const uploadResponse = await s3.send(new PutObjectCommand(params));
+
+        if (uploadResponse.$metadata.httpStatusCode === 200) {
+          const audioUrl = `https://${process.env.BUCKET}.s3.amazonaws.com/${fileName}`;
+
+          if (!id) {
+            // No user, insert into the general text table
             const newText = await pool.query(
               "INSERT INTO text (description, audio) VALUES ($1, $2) RETURNING *",
-              [description, publicFilePath]
+              [description, audioUrl]
             );
 
             res.json(audioData);
-          }
-        });
-      } else {
-        const path = `audio/users/${id}`;
-
-        if (!fs.existsSync(path)) {
-          fs.mkdirSync(path, { recursive: true });
-        }
-        // User exists, insert into the user-specific table
-        const userFilePath = `audio/users/${id}/${fileName}`;
-
-        fs.writeFile(userFilePath, audioData, "binary", async (err) => {
-          if (err) {
-            console.error("Error saving audio file:", err);
-            res.status(500).json({ error: "Failed to save audio" });
           } else {
+            // User exists, insert into the user-specific table
             const newUserAudio = await pool.query(
               `INSERT INTO user_audio (user_id, description, audio_path) VALUES ($1, $2, $3) RETURNING *`,
-              [id, description, userFilePath]
+              [id, description, audioUrl]
             );
 
-            res.json(newUserAudio);
+            res.json({ audioUrl });
           }
-        });
+        } else {
+          console.error("Error uploading audio to S3:", uploadResponse);
+          res.status(500).json({ error: "Failed to save audio" });
+        }
+      } catch (err) {
+        console.error("Error uploading audio to S3:", err);
+        res.status(500).json({ error: "Failed to save audio" });
       }
     }
   } catch (err) {
