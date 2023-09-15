@@ -21,7 +21,7 @@ app.use(
 );
 app.use(cookieParser());
 app.use(bodyParser.urlencoded({ extended: true }));
-
+const isProduction = process.env.NODE_ENV === "production";
 app.use(
   session({
     key: "userId",
@@ -33,7 +33,7 @@ app.use(
       domain: ".cyclic.app", // Set the appropriate domain
       path: "/",
       sameSite: "None", // Add the SameSite attribute
-      secure: true, // Set secure to true when using HTTPS
+      secure: isProduction, // Set secure to true when using HTTPS
     },
   })
 );
