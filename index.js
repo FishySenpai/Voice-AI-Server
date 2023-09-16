@@ -214,13 +214,14 @@ app.post("/text", async (req, res) => {
 app.get("/all", async (req, res) => {
   try {
     // Query the database to retrieve audio file paths
-    const result = await pool.query("SELECT * FROM text"); // Replace with your actual table name
-    const streamToString = (stream) =>
+    const result = await pool.query("SELECT * FROM text"); 
+    //converting it into bufferarray cuz binary was causing issues with conversion to audio
+    const streamToBufferArray = (stream) =>
       new Promise((resolve, reject) => {
         const chunks = [];
         stream.on("data", (chunk) => chunks.push(chunk));
         stream.on("error", reject);
-        stream.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+        stream.on("end", () => resolve(Buffer.concat(chunks)));
       });
     // Create an array to hold the audio data
     const audioFiles = [];
@@ -239,7 +240,8 @@ app.get("/all", async (req, res) => {
       const { Body } = await s3.send(getObjectCommand);
       // You can process the audio data here as needed
       // For example, you can convert it to base64 or store it in an array
-      const audioData = await streamToString(Body);
+      const audioData = await streamToBufferArray(Body);
+
       console.log(audioData);
       audioFiles.push({
         text_id: row.text_id,
