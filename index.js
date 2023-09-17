@@ -155,8 +155,12 @@ app.post("/text", async (req, res) => {
 
     if (response.status === 200) {
       const audioData = response.data;
-      const fileName = `audio_${Date.now()}.mp3`;
-
+      let fileName = `audio/public/audio_${Date.now()}.mp3`;
+      if (!id) {
+         fileName = `audio/public/audio_${Date.now()}.mp3`;
+      } else {
+         fileName = `audio/users/${id}/audio_${Date.now()}.mp3`;
+      }
       // Calculate the content length of the audio data
       const contentLength = audioData.length;
 
@@ -177,7 +181,7 @@ app.post("/text", async (req, res) => {
         const uploadResponse = await s3.send(new PutObjectCommand(params));
 
         if (uploadResponse.$metadata.httpStatusCode === 200) {
-          const audioUrl = `https://${process.env.BUCKET}.s3.amazonaws.com/${fileName}`;
+          const audioUrl = `${fileName}`;
 
           if (!id) {
             // No user, insert into the general text table
@@ -194,7 +198,7 @@ app.post("/text", async (req, res) => {
               [id, description, audioUrl]
             );
 
-            res.json({ audioUrl });
+            res.json(audioData);
           }
         } else {
           console.error("Error uploading audio to S3:", uploadResponse);
@@ -214,7 +218,7 @@ app.post("/text", async (req, res) => {
 app.get("/all", async (req, res) => {
   try {
     // Query the database to retrieve audio file paths
-    const result = await pool.query("SELECT * FROM text"); 
+    const result = await pool.query("SELECT * FROM text");
     //converting it into bufferarray cuz binary was causing issues with conversion to audio
     const streamToBufferArray = (stream) =>
       new Promise((resolve, reject) => {
@@ -234,7 +238,7 @@ app.get("/all", async (req, res) => {
       // Fetch the audio data from the S3 object
       const getObjectCommand = new GetObjectCommand({
         Bucket: process.env.BUCKET, // Replace with your S3 bucket name
-        Key: "audio_1694840349671.mp3", // Assuming audioPath contains the S3 object key
+        Key: audioPath, // Assuming audioPath contains the S3 object key
       });
 
       const { Body } = await s3.send(getObjectCommand);
@@ -261,30 +265,47 @@ app.get("/all", async (req, res) => {
 app.get("/user/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    // Query the database to retrieve the audio file paths
+    // Query the database to retrieve audio file paths
     const result = await pool.query(
       "SELECT * FROM user_audio where user_id = $1",
       [id]
     );
-
-    // Prepare an array to hold the audio file data
+    //converting it into bufferarray cuz binary was causing issues with conversion to audio
+    const streamToBufferArray = (stream) =>
+      new Promise((resolve, reject) => {
+        const chunks = [];
+        stream.on("data", (chunk) => chunks.push(chunk));
+        stream.on("error", reject);
+        stream.on("end", () => resolve(Buffer.concat(chunks)));
+      });
+    // Create an array to hold the audio data
     const audioFiles = [];
 
     // Iterate through the database results
     for (const row of result.rows) {
       const audioPath = row.audio_path; // Adjust this column name to match your schema
+      console.log(audioPath);
 
-      // Read the audio file from the server
-      const audioData = fs.readFileSync(audioPath);
+      // Fetch the audio data from the S3 object
+      const getObjectCommand = new GetObjectCommand({
+        Bucket: process.env.BUCKET, // Replace with your S3 bucket name
+        Key: audioPath, // Assuming audioPath contains the S3 object key
+      });
 
+      const { Body } = await s3.send(getObjectCommand);
+      // You can process the audio data here as needed
+      // For example, you can convert it to base64 or store it in an array
+      const audioData = await streamToBufferArray(Body);
+
+      console.log(audioData);
       audioFiles.push({
         id: row.id,
         description: row.description, // Add any other relevant data you want to include
-        audioData: audioData, // Convert audio data to base64 for sending
+        audioData: audioData,
       });
     }
 
-    // Send the array of audio files as JSON response
+    // Send the array of audio files as a JSON response to the frontend
     res.json(audioFiles);
   } catch (err) {
     console.error(err.message);
