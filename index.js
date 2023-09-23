@@ -99,14 +99,6 @@ app.post("/login", async (req, res) => {
       if (passwordMatch) {
         // Set a cookie to establish the session
         req.session.user = result.rows[0];
-
-        // Here, we set a cookie named 'sessionId' with the user's ID as its value
-        res.cookie("sessionId", result.rows[0].id, {
-          httpOnly: true, // Recommended for security
-          secure: true, // Recommended for HTTPS environments
-          sameSite: "none", // Recommended for cross-site cookies
-        });
-
         res.send(req.session.user);
       } else {
         res.send({ message: "Wrong email/password combination!" });
