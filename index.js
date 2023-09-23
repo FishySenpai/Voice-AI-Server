@@ -7,13 +7,12 @@ const bcrypt = require("bcrypt");
 const bodyParser = require("body-parser");
 const cookieParser = require("cookie-parser");
 const session = require("express-session");
-const deletePublicAudio = require("./routes/deletePublicAudio")
+const deletePublicAudio = require("./routes/deletePublicAudio");
 const deleteUserAudio = require("./routes/deleteUserAudio");
 const getAllPublic = require("./routes/getAllPublic");
-const createAudio = require("./routes/createAudio")
+const createAudio = require("./routes/createAudio");
 const saltRounds = 10;
 require("dotenv").config();
-
 
 app.use(express.json());
 app.use(
@@ -98,8 +97,16 @@ app.post("/login", async (req, res) => {
         result.rows[0].password
       );
       if (passwordMatch) {
+        // Set a cookie to establish the session
         req.session.user = result.rows[0];
-        console.log(req.session.user);
+
+        // Here, we set a cookie named 'sessionId' with the user's ID as its value
+        res.cookie("sessionId", result.rows[0].id, {
+          httpOnly: true, // Recommended for security
+          secure: true, // Recommended for HTTPS environments
+          sameSite: "none", // Recommended for cross-site cookies
+        });
+
         res.send(req.session.user);
       } else {
         res.send({ message: "Wrong email/password combination!" });
@@ -113,9 +120,8 @@ app.post("/login", async (req, res) => {
   }
 });
 
-
 app.use("/delete", deletePublicAudio);
-app.use(createAudio)
+app.use(createAudio);
 app.use(deleteUserAudio);
 app.use(getAllPublic);
 app.listen(5000, () => {
