@@ -7,24 +7,13 @@ const bcrypt = require("bcrypt");
 const bodyParser = require("body-parser");
 const cookieParser = require("cookie-parser");
 const session = require("express-session");
-
+const deletePublicAudio = require("./routes/deletePublicAudio")
+const deleteUserAudio = require("./routes/deleteUserAudio");
+const getAllPublic = require("./routes/getAllPublic");
+const createAudio = require("./routes/createAudio")
 const saltRounds = 10;
 require("dotenv").config();
-const fs = require("fs");
-const {
-  S3,
-  PutObjectCommand,
-  GetObjectCommand,
-} = require("@aws-sdk/client-s3");
-const { Readable } = require("stream");
-const s3 = new S3({
-  region: process.env.AWS_REGION,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    sessionToken: process.env.AWS_SESSION_TOKEN,
-  },
-});
+
 
 app.use(express.json());
 app.use(
@@ -36,7 +25,6 @@ app.use(
 );
 app.use(cookieParser());
 app.use(bodyParser.urlencoded({ extended: true }));
-const isProduction = process.env.NODE_ENV === "production";
 app.use(
   session({
     key: "userId",
@@ -45,9 +33,10 @@ app.use(
     saveUninitialized: false,
     cookie: {
       expires: 60 * 60 * 60 * 24,
-      domain: "localhost", // Set the appropriate domain
+      domain: ".cyclic.app", // Set the appropriate domain
       path: "/",
-      // Set secure to true when using HTTPS
+      sameSite: "None", // Add the SameSite attribute
+      secure: true,
     },
   })
 );
@@ -124,223 +113,11 @@ app.post("/login", async (req, res) => {
   }
 });
 
-app.post("/text", async (req, res) => {
-  console.log(req.session.user);
-  try {
-    const { description, id, voiceId } = req.body;
 
-    // Make a request to the external API to generate audio
-    const apiUrl = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`; // Replace with your actual API endpoint
-    const xiApiKey = process.env.xiApiKey; // Replace with your actual API key
-
-    const requestData = {
-      text: description, // Use the text from the request body
-      model_id: "eleven_monolingual_v1",
-      voice_settings: {
-        stability: 0.5,
-        similarity_boost: 0.5,
-      },
-    };
-
-    const headers = {
-      accept: "audio/mpeg",
-      "xi-api-key": xiApiKey,
-      "Content-Type": "application/json",
-    };
-
-    const response = await axios.post(apiUrl, requestData, {
-      headers,
-      responseType: "arraybuffer",
-    });
-
-    if (response.status === 200) {
-      const audioData = response.data;
-      let fileName = `audio/public/audio_${Date.now()}.mp3`;
-      if (!id) {
-         fileName = `audio/public/audio_${Date.now()}.mp3`;
-      } else {
-         fileName = `audio/users/${id}/audio_${Date.now()}.mp3`;
-      }
-      // Calculate the content length of the audio data
-      const contentLength = audioData.length;
-
-      // Convert audioData to a readable stream
-      const audioStream = new Readable();
-      audioStream.push(audioData);
-      audioStream.push(null);
-
-      const params = {
-        Bucket: process.env.BUCKET, // Replace with your S3 bucket name
-        Key: fileName,
-        Body: audioStream,
-        ContentType: "audio/mpeg",
-        ContentLength: contentLength, // Set the content length
-      };
-
-      try {
-        const uploadResponse = await s3.send(new PutObjectCommand(params));
-
-        if (uploadResponse.$metadata.httpStatusCode === 200) {
-          const audioUrl = `${fileName}`;
-
-          if (!id) {
-            // No user, insert into the general text table
-            const newText = await pool.query(
-              "INSERT INTO text (description, audio) VALUES ($1, $2) RETURNING *",
-              [description, audioUrl]
-            );
-
-            res.json(audioData);
-          } else {
-            // User exists, insert into the user-specific table
-            const newUserAudio = await pool.query(
-              `INSERT INTO user_audio (user_id, description, audio_path) VALUES ($1, $2, $3) RETURNING *`,
-              [id, description, audioUrl]
-            );
-
-            res.json(audioData);
-          }
-        } else {
-          console.error("Error uploading audio to S3:", uploadResponse);
-          res.status(500).json({ error: "Failed to save audio" });
-        }
-      } catch (err) {
-        console.error("Error uploading audio to S3:", err);
-        res.status(500).json({ error: "Failed to save audio" });
-      }
-    }
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-app.get("/all", async (req, res) => {
-  try {
-    // Query the database to retrieve audio file paths
-    const result = await pool.query("SELECT * FROM text");
-    //converting it into bufferarray cuz binary was causing issues with conversion to audio
-    const streamToBufferArray = (stream) =>
-      new Promise((resolve, reject) => {
-        const chunks = [];
-        stream.on("data", (chunk) => chunks.push(chunk));
-        stream.on("error", reject);
-        stream.on("end", () => resolve(Buffer.concat(chunks)));
-      });
-    // Create an array to hold the audio data
-    const audioFiles = [];
-
-    // Iterate through the database results
-    for (const row of result.rows) {
-      const audioPath = row.audio; // Adjust this column name to match your schema
-      console.log(audioPath);
-
-      // Fetch the audio data from the S3 object
-      const getObjectCommand = new GetObjectCommand({
-        Bucket: process.env.BUCKET, // Replace with your S3 bucket name
-        Key: audioPath, // Assuming audioPath contains the S3 object key
-      });
-
-      const { Body } = await s3.send(getObjectCommand);
-      // You can process the audio data here as needed
-      // For example, you can convert it to base64 or store it in an array
-      const audioData = await streamToBufferArray(Body);
-
-      console.log(audioData);
-      audioFiles.push({
-        text_id: row.text_id,
-        description: row.description, // Add any other relevant data you want to include
-        audioData: audioData,
-      });
-    }
-
-    // Send the array of audio files as a JSON response to the frontend
-    res.json(audioFiles);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-app.get("/user/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    // Query the database to retrieve audio file paths
-    const result = await pool.query(
-      "SELECT * FROM user_audio where user_id = $1",
-      [id]
-    );
-    //converting it into bufferarray cuz binary was causing issues with conversion to audio
-    const streamToBufferArray = (stream) =>
-      new Promise((resolve, reject) => {
-        const chunks = [];
-        stream.on("data", (chunk) => chunks.push(chunk));
-        stream.on("error", reject);
-        stream.on("end", () => resolve(Buffer.concat(chunks)));
-      });
-    // Create an array to hold the audio data
-    const audioFiles = [];
-
-    // Iterate through the database results
-    for (const row of result.rows) {
-      const audioPath = row.audio_path; // Adjust this column name to match your schema
-      console.log(audioPath);
-
-      // Fetch the audio data from the S3 object
-      const getObjectCommand = new GetObjectCommand({
-        Bucket: process.env.BUCKET, // Replace with your S3 bucket name
-        Key: audioPath, // Assuming audioPath contains the S3 object key
-      });
-
-      const { Body } = await s3.send(getObjectCommand);
-      // You can process the audio data here as needed
-      // For example, you can convert it to base64 or store it in an array
-      const audioData = await streamToBufferArray(Body);
-
-      console.log(audioData);
-      audioFiles.push({
-        id: row.id,
-        description: row.description, // Add any other relevant data you want to include
-        audioData: audioData,
-      });
-    }
-
-    // Send the array of audio files as a JSON response to the frontend
-    res.json(audioFiles);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-app.delete("/delete/:id", async (req, res) => {
-  {
-    try {
-      const { id } = req.params;
-      const newText = await pool.query("DELETE FROM text WHERE text_id = $1", [
-        id,
-      ]);
-      res.json("text was deleted");
-    } catch (err) {
-      console.error(err.message);
-    }
-  }
-});
-app.delete("/user/delete/:id", async (req, res) => {
-  {
-    try {
-      const { id } = req.params;
-      const newText = await pool.query("DELETE FROM user_audio WHERE id = $1", [
-        id,
-      ]);
-      console.log(newText);
-      res.json("file deleted was deleted");
-    } catch (err) {
-      console.error(err.message);
-    }
-  }
-});
-
+app.use("/delete", deletePublicAudio);
+app.use(createAudio)
+app.use(deleteUserAudio);
+app.use(getAllPublic);
 app.listen(5000, () => {
   console.log("test");
 });
