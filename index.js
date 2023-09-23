@@ -17,7 +17,7 @@ require("dotenv").config();
 app.use(express.json());
 app.use(
   cors({
-    origin: ["http://localhost:5173"],
+    origin: ["https://voice-ai-clone.netlify.app"],
     methods: ["GET", "POST", "DELETE"],
     credentials: true,
   })
