@@ -17,11 +17,12 @@ require("dotenv").config();
 app.use(express.json());
 app.use(
   cors({
-    origin: ["https://voice-ai-clone.netlify.app"],
+    origin: ["https://voice-ai-clone.netlify.app", "http://localhost:5173"],
     methods: ["GET", "POST", "DELETE"],
     credentials: true,
   })
 );
+
 app.use(cookieParser());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(
@@ -32,13 +33,15 @@ app.use(
     saveUninitialized: false,
     cookie: {
       expires: 60 * 60 * 60 * 24,
-      domain: ".cyclic.app", // Set the appropriate domain
+      domain:
+        process.env.NODE_ENV === "production" ? ".cyclic.app" : "localhost",
       path: "/",
-      sameSite: "None", // Add the SameSite attribute
-      secure: true,
+      sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+      secure: process.env.NODE_ENV === "production",
     },
   })
 );
+
 
 app.post("/register", async (req, res) => {
   try {
