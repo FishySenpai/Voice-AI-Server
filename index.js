@@ -39,9 +39,6 @@ app.use(
   })
 );
 
-
-
-
 app.post("/register", async (req, res) => {
   try {
     const name = req.body.name;
@@ -100,9 +97,18 @@ app.post("/login", async (req, res) => {
       );
       if (passwordMatch) {
         // Set a cookie to establish the session
-        req.session.user = result.rows[0];
-        
-        res.send(req.session.user);
+        res.cookie("yourCookieName", "cookieValue", {
+          // Set cookie options here
+          maxAge: 60 * 60 * 60 * 24 * 1000, // Cookie expiration time in milliseconds
+          domain:
+            process.env.NODE_ENV === "production" ? ".cyclic.app" : "localhost",
+          path: "/",
+          sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+          secure: process.env.NODE_ENV === "production" ? true : false,
+          httpOnly: true, // Ensures the cookie is accessible only via HTTP
+        });
+
+        res.send({ message: "Login successful" });
       } else {
         res.send({ message: "Wrong email/password combination!" });
       }
