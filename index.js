@@ -32,12 +32,13 @@ app.use(
     name: "session", // Name for the cookie
     keys: [process.env.secret], // Array of keys to sign cookies
     maxAge: 60 * 60 * 60 * 24 * 1000, // Cookie expiration time in milliseconds
-    domain: process.env.NODE_ENV === "production" ? "localhost" : ".cyclic.app",
+    domain: process.env.NODE_ENV === "production" ? ".cyclic.app" : "localhost",
     path: "/",
-    sameSite: process.env.NODE_ENV === "production" ? "Lax" : "None",
-    secure: process.env.NODE_ENV === "production" ? false : true,
+    sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+    secure: process.env.NODE_ENV === "production" ? true : false,
   })
 );
+
 
 
 
