@@ -6,7 +6,7 @@ const axios = require("axios");
 const bcrypt = require("bcrypt");
 const bodyParser = require("body-parser");
 const cookieParser = require("cookie-parser");
-const session = require("express-session");
+const session = require("cookie-session");
 const deletePublicAudio = require("./routes/deletePublicAudio");
 const deleteUserAudio = require("./routes/deleteUserAudio");
 const getAllPublic = require("./routes/getAllPublic");
@@ -25,22 +25,20 @@ app.use(
 
 app.use(cookieParser());
 app.use(bodyParser.urlencoded({ extended: true }));
+// Warning: connect.session() MemoryStore is not designed for a production environment, as it will leak memory, and will not scale past a single process.
+// have to use redis or smth similar when using express session outside local einvironment to store sessions and validate them
 app.use(
   session({
-    key: "userId",
-    secret: process.env.secret,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      expires: 60 * 60 * 60 * 24,
-      domain:
-        process.env.NODE_ENV === "production" ? ".cyclic.app" : "localhost",
-      path: "/",
-      sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
-      secure: process.env.NODE_ENV === "production",
-    },
+    name: "session", // Name for the cookie
+    keys: [process.env.secret], // Array of keys to sign cookies
+    maxAge: 60 * 60 * 60 * 24 * 1000, // Cookie expiration time in milliseconds
+    domain: process.env.NODE_ENV === "production" ? "localhost" : ".cyclic.app",
+    path: "/",
+    sameSite: process.env.NODE_ENV === "production" ? "Lax" : "None",
+    secure: process.env.NODE_ENV === "production" ? false : true,
   })
 );
+
 
 
 app.post("/register", async (req, res) => {
@@ -102,6 +100,7 @@ app.post("/login", async (req, res) => {
       if (passwordMatch) {
         // Set a cookie to establish the session
         req.session.user = result.rows[0];
+        
         res.send(req.session.user);
       } else {
         res.send({ message: "Wrong email/password combination!" });
