@@ -17,7 +17,7 @@ require("dotenv").config();
 app.use(express.json());
 app.use(
   cors({
-    origin: ["https://voice-ai-clone.netlify.app", "http://localhost:5173"],
+    origin: ["https://voice-ai-clone.netlify.app"],
     methods: ["GET", "POST", "DELETE"],
     credentials: true,
   })
@@ -32,15 +32,12 @@ app.use(
     name: "session", // Name for the cookie
     keys: [process.env.secret], // Array of keys to sign cookies
     maxAge: 60 * 60 * 60 * 24 * 1000, // Cookie expiration time in milliseconds
-    domain: process.env.NODE_ENV === "production" ? ".cyclic.app" : "localhost",
+    domain: ".cyclic.app",
     path: "/",
-    sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
-    secure: process.env.NODE_ENV === "production" ? true : false,
+    sameSite: "None",
+    secure: true,
   })
 );
-
-
-
 
 app.post("/register", async (req, res) => {
   try {
@@ -101,7 +98,7 @@ app.post("/login", async (req, res) => {
       if (passwordMatch) {
         // Set a cookie to establish the session
         req.session.user = result.rows[0];
-        
+
         res.send(req.session.user);
       } else {
         res.send({ message: "Wrong email/password combination!" });
