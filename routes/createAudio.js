@@ -54,7 +54,7 @@ router.post("/createAudio", async (req, res) => {
       audioStream.push(null);
 
       const params = {
-        Bucket: process.env.BUCKET, // Replace with your S3 bucket name
+        Bucket: process.env.CYCLIC_BUCKET_NAME, // Replace with your S3 bucket name
         Key: fileName,
         Body: audioStream,
         ContentType: "audio/mpeg",

@@ -25,7 +25,10 @@ app.use(
 
 app.use(cookieParser());
 app.use(bodyParser.urlencoded({ extended: true }));
+
+//allowing proxy allowed setcookie header to be sent
 app.set("trust proxy", 1);
+
 // Warning: connect.session() MemoryStore is not designed for a production environment, as it will leak memory, and will not scale past a single process.
 // have to use redis or smth similar when using express session outside local einvironment to store sessions and validate them
 app.use(

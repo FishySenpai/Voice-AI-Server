@@ -28,7 +28,7 @@ router.get("/all", async (req, res) => {
 
       // Fetch the audio data from the S3 object
       const getObjectCommand = new GetObjectCommand({
-        Bucket: process.env.BUCKET, // Replace with your S3 bucket name
+        Bucket: process.env.CYCLIC_BUCKET_NAME, // Replace with your S3 bucket name
         Key: audioPath, // Assuming audioPath contains the S3 object key
       });
 
