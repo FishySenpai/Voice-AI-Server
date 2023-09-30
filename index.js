@@ -10,6 +10,7 @@ const session = require("cookie-session");
 const deletePublicAudio = require("./routes/deletePublicAudio");
 const deleteUserAudio = require("./routes/deleteUserAudio");
 const getAllPublic = require("./routes/getAllPublic");
+const getAllUserAudio = require("./routes/getAllUserAudio")
 const createAudio = require("./routes/createAudio");
 const saltRounds = 10;
 require("dotenv").config();
@@ -123,6 +124,7 @@ app.use("/delete", deletePublicAudio);
 app.use(createAudio);
 app.use(deleteUserAudio);
 app.use(getAllPublic);
+app.use(getAllUserAudio)
 app.listen(5000, () => {
   console.log("test");
 });
